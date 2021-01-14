@@ -37,9 +37,9 @@ public class Qlearn {
     private static final int HOSTS = 100;
     private static final int HOST_PES = 8;
 
-    private int CLOUDLETS = 6;//读取data中某列的数据，在某300s内的总数
+    private int CLOUDLETS = 10;//读取data中某列的数据，在某300s内的总数
     private static final int CLOUDLET_LENGTH = 1500;
-    private  int VMS =6;
+    private  int VMS =10;
 
     private final CloudSim simulation;
     //比较不同算法,修改三处broker类

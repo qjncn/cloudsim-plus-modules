@@ -78,12 +78,14 @@ public class CloudletToVmMappingQlearn
     private double[][] Q;           //不同broker对象调用的算法Q值不同
     private double[][] graph;       //不同broker对象调用的算法graph值不同
     private double epsilon = 0.1;     //贪婪因子
+    private final double totalMips ;
+    private final double totalLength ;
 
     private final double alpha = 0.1;       //学习率 权衡这次和上次学习结果的权重
     private final double gamma = 0.8;       //衰减因子 考虑未来奖励的权重
     private final double  threshold = 0.00000000000000001; //收敛停止阀值
     private final int MAX_EPISODES = 1000000; // 一般都通过设置最大迭代次数来控制训练轮数
-    private final int REWARD_TAG = 1; //控制奖励算法 //0是差值奖励，1是+-1,2是执行平均时间的倒数,3是执行平均时间的负数
+    private final int REWARD_TAG = 4; //控制奖励算法 //0是差值奖励，1是+-1,2是执行平均时间的倒数,3是执行平均时间的负数,4是相似度
     private final boolean RANDOM_CHOOSE_ROW = false; //是否启用随机遍历行
 
     private  Map map =  new HashMap();
@@ -101,6 +103,8 @@ public class CloudletToVmMappingQlearn
         this.NumOfCloudlet = cloudletList.size();
         this.NumOfVM = vmList.size();
         this.broker = broker;
+        this.totalMips = getTotalMips();
+        this.totalLength = getTotalLeanth();
 
         /**
          * 状态空间由C和V组成，C是300秒内所有cloudlet的有序集合，V是300秒内所有VM的有序集合
@@ -134,6 +138,7 @@ public class CloudletToVmMappingQlearn
             }
         }
 
+
         /**
          * 设置超参数
          * @param epsilon： 贪婪因子，概率选择 Q规则，或者随机选择动作，防止局部最优？
@@ -153,7 +158,7 @@ public class CloudletToVmMappingQlearn
             System.out.println("第" + episode + "轮训练.....>>>>>>>>>" + process +"%" );
             //新设计了函数epsilon为收敛
             //函数1 开始慢逐渐快速下降
-            epsilon = 0.5* Math.cos(Math.PI/(2*MAX_EPISODES) * episode);
+            epsilon = 0.2* Math.cos(Math.PI/(2*MAX_EPISODES) * episode);
             //函数2 首尾慢，中间快
             //epsilon = 0.25 * Math.cos(Math.PI/(MAX_EPISODES) * episode) + 0.25;
             System.out.println("本轮贪婪因子衰减为"+epsilon);
@@ -380,16 +385,20 @@ public class CloudletToVmMappingQlearn
                 break;
             }
             case 1:{
-                if ((meanOld - meanNew) < 0) reward = -10.0; //拉低了平均时间则奖励 1 否则 -1
-                else reward = 1.0;
+                if ((meanOld - meanNew) < 0) reward = -5.0; //拉低了平均时间则奖励 1 否则 -1
+                else reward = 1;
                 break;
             }
             case 2:{
-                reward = 1/meanNew; //执行平均时间的倒数
+                reward = 1/meanNew; //执行平均时间的倒数，加上权重i
                 break;
             }
             case 3:{
-                reward = -meanNew; //执行平均时间的倒数
+                reward = -meanNew; //执行平均时间的负数
+                break;
+            }
+            case 4:{
+                reward = -Math.abs((this.cloudletList.get(CloudID).getLength()/totalLength - this.vmList.get(VmID).getMips()/totalMips));
                 break;
             }
             default: return 0;
@@ -408,6 +417,22 @@ public class CloudletToVmMappingQlearn
         Integer[] strs = new Integer[num.size()];
         num.toArray(strs);
         return strs;
+    }
+
+    private double getTotalLeanth() {
+        double sum = 0;
+        for (int i = 0; i < NumOfCloudlet; i++) {
+            sum = sum + this.cloudletList.get(i).getLength();
+        }
+        return sum;
+    }
+
+    private double getTotalMips(){
+        double sum = 0;
+        for (int i = 0; i < NumOfVM; i++) {
+            sum = sum + this.vmList.get(i).getMips();
+        }
+        return sum;
     }
 }
 
