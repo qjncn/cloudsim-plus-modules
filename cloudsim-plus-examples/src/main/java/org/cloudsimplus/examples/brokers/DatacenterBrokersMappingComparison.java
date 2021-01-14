@@ -114,7 +114,7 @@ public class DatacenterBrokersMappingComparison {
         System.out.println("Starting comparison...");
 
         final long seed = System.currentTimeMillis();
-        final boolean verbose = false;
+        final boolean verbose = true;
 
         // Heuristic
         final CloudSim simulation0 = new CloudSim();
@@ -163,14 +163,14 @@ public class DatacenterBrokersMappingComparison {
 
         print(verbose);
     }
-
+    //创建heuristic算子，进而创建heuristicbroker并绑定该算子
     private static DatacenterBrokerHeuristic createHeuristicBroker(final CloudSim sim, final ContinuousDistribution rand) {
         CloudletToVmMappingSimulatedAnnealing heuristic = createSimulatedAnnealingHeuristic(rand);
         final DatacenterBrokerHeuristic broker = new DatacenterBrokerHeuristic(sim);
         broker.setHeuristic(heuristic);
         return broker;
     }
-
+    //创建heuristic算子，设置算法的参数
     private static CloudletToVmMappingSimulatedAnnealing createSimulatedAnnealingHeuristic(final ContinuousDistribution rand) {
         CloudletToVmMappingSimulatedAnnealing heuristic =
             new CloudletToVmMappingSimulatedAnnealing(SA_INITIAL_TEMPERATURE, rand);
@@ -213,7 +213,7 @@ public class DatacenterBrokersMappingComparison {
     private int getRandomPesNumber(final int maxPesNumber, final ContinuousDistribution random) {
         final double uniform = random.sample();
 
-        /*always get an index between [0 and size[,
+        /*always get an index between [0 and size[,        ##1-5
         regardless if the random number generator returns
         values between [0 and 1[ or >= 1*/
         return (int) (uniform >= 1 ? uniform % maxPesNumber : uniform * maxPesNumber) + 1;

@@ -37,10 +37,9 @@ public class Qlearn {
     private static final int HOSTS = 100;
     private static final int HOST_PES = 8;
 
-    private int CLOUDLETS = 0;//读取data中某列的数据，在某300s内的总数
+    private int CLOUDLETS = 6;//读取data中某列的数据，在某300s内的总数
     private static final int CLOUDLET_LENGTH = 1500;
-    private  int VMS =0;
-
+    private  int VMS =6;
 
     private final CloudSim simulation;
     //比较不同算法,修改三处broker类
@@ -52,7 +51,6 @@ public class Qlearn {
     private DatacenterSimple datacenter0;
 
     private double batchMeanTime;
-
     //main
     public static void main(String[] args) {
         new Qlearn();
@@ -60,19 +58,21 @@ public class Qlearn {
 
     private Qlearn() {
         Log.setLevel(Level.OFF);
-        cloudletList = new ArrayList<>(CLOUDLETS);//一批的列表,可以累加
-        vmList = new ArrayList<>(VMS);
         simulation = new CloudSim();
-        simulation.addOnClockTickListener(this::onClockTickListener);
+        //simulation.addOnClockTickListener(this::onClockTickListener);
         datacenter0 =  createDatacenter();
-
         //simulation.addOnClockTickListener(this::createAndSubmitCloudletsAndVmsAndBorkers);
-        totalCloudletList = createAndSubmitCloudletsAndVmsAndBorkers();
+        cloudletList = createCloudlets(0);
+        vmList = createVms();
+        DatacenterBrokerQlearn broker= new DatacenterBrokerQlearn(simulation,cloudletList,vmList);
+        brokers.add(broker);
+        broker.submitVmList(vmList);
+        broker.submitCloudletList(cloudletList);
         simulation.start();
         printResults();
-
-
     }
+
+
 
     /**
      * Shows updates every time the simulation clock advances.
@@ -92,55 +92,54 @@ public class Qlearn {
     /**
      * 创建cloudlet，从data中读取出总数分批次设置延迟，构造
      */
-    private List<Cloudlet> createAndSubmitCloudletsAndVmsAndBorkers() {
+//    private List<Cloudlet> createAndSubmitCloudletsAndVmsAndBorkers() {
+//
+//        ReadCsv readCsv = new ReadCsv(0);
+//        //读取到全部负载数组
+//        int[] totalNumCLOUDLETS = readCsv.getCloudletList();
+//        //debug 调试用，取前几个值
+//        totalNumCLOUDLETS = Arrays.copyOfRange(totalNumCLOUDLETS, 0, 1);
+//        //设置批次延迟
+//        int n=0;//批次
+//        //for循环负责批次循环
+//        //for (int e:totalNumCLOUDLETS) {
+    private List<Cloudlet> createCloudlets(int n){
+        final List<Cloudlet> list = new ArrayList<>(CLOUDLETS);
+        int submissionDelay = 300*n;    //延迟
+        java.util.Random r = new java.util.Random(10);
+        for (int i = 0; i < CLOUDLETS; i++) {
+            Cloudlet cloudlet =
+                //new CloudletSimple(i,1000*i+15000,1)    //CLOUDLET_LENGTH长度不同15000-30000
+                new CloudletSimple(i, r.nextInt(20000) + 10000, 1)
+                    //.setFileSize(1024)
+                    //.setOutputSize(1024)
+                    .setUtilizationModel(new UtilizationModelFull());
+            cloudlet.setSubmissionDelay(submissionDelay);
+            list.add(cloudlet);
+        }
+        return list;
+    }
 
-        ReadCsv readCsv = new ReadCsv(0);
-        //读取到全部负载数组
-        int[] totalNumCLOUDLETS = readCsv.getCloudletList();
-        //debug 调试用，取前几个值
-        totalNumCLOUDLETS = Arrays.copyOfRange(totalNumCLOUDLETS, 0, 1);
-        //设置批次延迟
-        int n=0;//批次
-        //for循环负责批次循环
-        //for (int e:totalNumCLOUDLETS) {
-            int submissionDelay = 300*n;    //延迟
-            //e=4;           //单独设置任务数量
-            CLOUDLETS = 4;  //得到一批的总数
-            VMS = 4;
-            final List<Cloudlet> list = new ArrayList<>(CLOUDLETS);
-            UtilizationModel utilization = new UtilizationModelFull();
-            java.util.Random r = new java.util.Random(10);
-            for (int i = 0; i < CLOUDLETS; i++) {
-                Cloudlet cloudlet =
-                    //new CloudletSimple(i,1000*i+15000,1)    //CLOUDLET_LENGTH长度不同15000-30000
-                    new CloudletSimple(i,r.nextInt(20000)+10000,1)
-                        //.setFileSize(1024)
-                        //.setOutputSize(1024)
-                        .setUtilizationModel(utilization);
-                cloudlet.setSubmissionDelay(submissionDelay);
-                cloudletList.add(cloudlet);
-            }
+    private List<Vm> createVms(){
+        final List<Vm> list = new ArrayList<>(VMS);
+        //todo random长度的Vm 100-300
+        java.util.Random R=new java.util.Random(20);
+
+        for (int i = 0; i < VMS; i++) {
+            Vm vm =
+                new VmSimple( i,R.nextInt(200)+100, 1) //100-300
+                    //.setRam(512).setBw(1000).setSize(10000)
+                    .setCloudletScheduler(new CloudletSchedulerSpaceShared());
+            list.add(vm);
+        }
+        return list;
+    }
 
 
 
-            //todo random长度的Vm 100-300
-            java.util.Random R=new java.util.Random(20);
-
-            for (int i = 0; i < VMS; i++) {
-                Vm vm =
-                    new VmSimple( i,R.nextInt(200)+100, 1) //100-300
-                        //.setRam(512).setBw(1000).setSize(10000)
-                        .setCloudletScheduler(new CloudletSchedulerSpaceShared());
-                vmList.add(vm);
-            }
-            DatacenterBrokerQlearn brokertemp= new DatacenterBrokerQlearn(simulation,cloudletList,vmList);
-            brokers.add(brokertemp);
-            brokertemp.submitVmList(vmList);
-            brokertemp.submitCloudletList(cloudletList);
             //batchMeanTime = brokertemp.meanTime;
             //System.out.printf("batch %d 's mean time is %f",n,batchMeanTime);
-            n++;
-            totalCloudletList.addAll(cloudletList);//增加一批到总表
+
 
             //对比其他算法
 //            DatacenterBrokerQlearn brokertemp= new DatacenterBrokerQlearn()simulation);
@@ -153,8 +152,7 @@ public class Qlearn {
 //            totalCloudletList.addAll(cloudletList);//增加一批到总表
 
 
-        return totalCloudletList;
-    }
+
 
     /**
      * Creates a list of VMs with decreasing number of PEs.

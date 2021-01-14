@@ -82,7 +82,7 @@ public class BasicFirstExample {
         simulation = new CloudSim();
         datacenter0 = createDatacenter();
 
-        //Creates a broker that is a software acting on behalf a cloud customer to manage his/her VMs and Cloudlets
+        //Creates a broker that is a software acting on behalf a cloud customer to manage his/her VMs and Cloudlets 代表云客户管理vm和cloudlets
         broker0 = new DatacenterBrokerSimple(simulation);
 
         vmList = createVms();

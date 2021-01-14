@@ -32,7 +32,7 @@ public final class CloudSimEvent implements SimEvent {
     private final Type type;
 
     /**
-     * The actual simulation time that this event was scheduled to (at which it should occur).
+     * The actual simulation time that this event was scheduled to (at which it should occur).在它应该发生的时候
      */
     private final double time;
 
@@ -66,6 +66,7 @@ public final class CloudSimEvent implements SimEvent {
      * @param src the source entity which is sending the message
      * @param dest the destination entity which has to receive the message
      * @param tag the tag that identifies the type of the message (which is used by the destination entity to perform operations based on the message type)
+     *            标识消息类型的标记，目标实体使用该标记根据消息类型执行操作
      * @param data the data attached to the message, that depends on the message tag
      */
     public CloudSimEvent(

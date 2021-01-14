@@ -338,7 +338,7 @@ public abstract class CloudSimEntity implements SimEntity {
     }
 
     public void run(final double until) {
-        SimEvent evt = buffer == null ? getNextEvent(e -> e.getTime() <= until) : buffer;
+        SimEvent evt = buffer == null ? getNextEvent(e -> e.getTime() <= until) : buffer; //取buffer里的或者下一个event
 
         while (evt != SimEvent.NULL) {
             processEvent(evt);
@@ -346,7 +346,7 @@ public abstract class CloudSimEntity implements SimEntity {
                 break;
             }
 
-            evt = getNextEvent(e -> e.getTime() <= until);
+            evt = getNextEvent(e -> e.getTime() <= until);//取下一个event
         }
 
         buffer = null;

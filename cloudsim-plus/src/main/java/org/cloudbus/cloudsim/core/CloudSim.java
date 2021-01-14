@@ -262,7 +262,7 @@ public class CloudSim implements Simulation {
     }
 
     @Override
-    public void startSync() {
+    public void startSync() {  //同步
         if(alreadyRunOnce){
             throw new UnsupportedOperationException(
                 "You can't run a simulation that has already run previously. " +

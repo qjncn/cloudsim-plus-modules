@@ -23,8 +23,8 @@ import java.util.TreeSet;
  * Other entities such as the broker can contact this class for
  * resource discovery service, which returns a list of registered resource.
  * <p>
- * In summary, it acts like a yellow page service.
- * An instance of this class is automatically created by CloudSim upon initialisation of the simulation.
+ * In summary, it acts like a yellow page service.类似黄页
+ * An instance of this class is automatically created by CloudSim upon initialisation of the simulation.模拟开始初始化时候自动创建的
  *
  * @author Manzur Murshed
  * @author Rajkumar Buyya

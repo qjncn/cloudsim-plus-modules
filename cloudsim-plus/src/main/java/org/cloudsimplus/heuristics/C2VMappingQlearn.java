@@ -21,29 +21,6 @@
  *     You should have received a copy of the GNU General Public License
  *     along with CloudSim Plus. If not, see <http://www.gnu.org/licenses/>.
  */
-/*
- * CloudSim Plus: A modern, highly-extensible and easier-to-use Framework for
- * Modeling and Simulation of Cloud Computing Infrastructures and Services.
- * http://cloudsimplus.org
- *
- *     Copyright (C) 2015-2018 Universidade da Beira Interior (UBI, Portugal) and
- *     the Instituto Federal de Educação Ciência e Tecnologia do Tocantins (IFTO, Brazil).
- *
- *     This file is part of CloudSim Plus.
- *
- *     CloudSim Plus is free software: you can redistribute it and/or modify
- *     it under the terms of the GNU General Public License as published by
- *     the Free Software Foundation, either version 3 of the License, or
- *     (at your option) any later version.
- *
- *     CloudSim Plus is distributed in the hope that it will be useful,
- *     but WITHOUT ANY WARRANTY; without even the implied warranty of
- *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *     GNU General Public License for more details.
- *
- *     You should have received a copy of the GNU General Public License
- *     along with CloudSim Plus. If not, see <http://www.gnu.org/licenses/>.
- */
 package org.cloudsimplus.heuristics;
 
 import org.cloudbus.cloudsim.brokers.DatacenterBrokerQlearn;
@@ -53,17 +30,15 @@ import org.cloudbus.cloudsim.vms.Vm;
 import java.util.*;
 //import java.util.List;
 
-//import org.python.core.PyFunction;
-//import org.python.core.PyList;
-////import org.python.core.PyObject;
-//import org.python.util.PythonInterpreter;
+import org.python.core.*;
+import org.python.util.PythonInterpreter;
 
 
 /**
  *实现 Qlearn算法，返回
  *
  */
-public class CloudletToVmMappingQlearn
+public class C2VMappingQlearn
 {
 
 
@@ -76,26 +51,18 @@ public class CloudletToVmMappingQlearn
     private int NumOfCloudlet;      //不同broker对象调用的算法NumOfCloudlet值不同
     private int NumOfVM;            //不同broker对象调用的算法NumOfVM值不同
     private double[][] Q;           //不同broker对象调用的算法Q值不同
+    Map Q2;
     private double[][] graph;       //不同broker对象调用的算法graph值不同
-    private double epsilon = 0.1;     //贪婪因子
+    private double epsilon = 0.6;     //贪婪因子
 
-    private final double alpha = 0.1;       //学习率 权衡这次和上次学习结果的权重
-    private final double gamma = 0.8;       //衰减因子 考虑未来奖励的权重
-    private final double  threshold = 0.00000000000000001; //收敛停止阀值
-    private final int MAX_EPISODES = 1000000; // 一般都通过设置最大迭代次数来控制训练轮数
-    private final int REWARD_TAG = 1; //控制奖励算法 //0是差值奖励，1是+-1,2是执行平均时间的倒数,3是执行平均时间的负数
-    private final boolean RANDOM_CHOOSE_ROW = false; //是否启用随机遍历行
-
+    private final double alpha = 0.1;       //学习率 权衡这次和上次学习结果
+    private final double gamma = 0.9;       //衰减因子 考虑未来奖励,越大后面权重越高
+    private final double  threshold = 0.0001; //收敛停止阀值
+    private final int MAX_EPISODES = 10000000; // 一般都通过设置最大迭代次数来控制训练轮数
     private  Map map =  new HashMap();
     private  DatacenterBrokerQlearn broker;
 
-    private static double QvalueDelta ;
-    private static double meanOld ;
-    private static double meanNew  ;
-    private static double sum ;
-
-
-    public CloudletToVmMappingQlearn(List<Cloudlet> cloudletList, List<Vm> vmList, DatacenterBrokerQlearn broker) {
+    public C2VMappingQlearn(List<Cloudlet> cloudletList, List<Vm> vmList, DatacenterBrokerQlearn broker) {
         this.cloudletList = cloudletList;
         this.vmList = vmList;
         this.NumOfCloudlet = cloudletList.size();
@@ -120,6 +87,10 @@ public class CloudletToVmMappingQlearn
 //            }
 //        }
         /**
+         * 构造Q2矩阵，map字典类型，默认初始为空
+         */
+        this.Q2=new HashMap();
+        /**
          * reward图 先考虑执行时间的负数（或倒数）
          * 执行时间 t定义包括：job产生时刻到处理完之间的时间，其中包括了的处理时间和队列等待时间。
          * 这里为了突出算法，只考虑处理时间。
@@ -133,6 +104,7 @@ public class CloudletToVmMappingQlearn
                 this.graph[i][j] = this.cloudletList.get(i).getLength() / this.vmList.get(j).getMips();
             }
         }
+
 
         /**
          * 设置超参数
@@ -152,36 +124,33 @@ public class CloudletToVmMappingQlearn
 
             System.out.println("第" + episode + "轮训练.....>>>>>>>>>" + process +"%" );
             //新设计了函数epsilon为收敛
-            //函数1 开始慢逐渐快速下降
-            epsilon = 0.5* Math.cos(Math.PI/(2*MAX_EPISODES) * episode);
-            //函数2 首尾慢，中间快
-            //epsilon = 0.25 * Math.cos(Math.PI/(MAX_EPISODES) * episode) + 0.25;
+            //函数1 开始慢逐渐快速下降，探索面积比较大
+            //epsilon = 0.2 * Math.cos(Math.PI/(2*MAX_EPISODES) * episode);
+            //函数2 首尾慢，中间快 探索面积比较小
+            epsilon = 0.1 * Math.cos(Math.PI/(MAX_EPISODES) * episode) + 0.1;
             System.out.println("本轮贪婪因子衰减为"+epsilon);
 
             List<Integer> chosenVmID = new ArrayList<Integer>();
             List<Integer> chosenCloudletID = new ArrayList<Integer>();
 
-            //todo 随机遍历，彻底解决for中的max筛选次序问题
-
-            Integer[] strs=new Integer[NumOfCloudlet];
-            for (int i = 0; i < NumOfCloudlet; i++) {
-                strs[i]=i;
-            }
-            if(RANDOM_CHOOSE_ROW) {
-                strs = randowRow();
-            }
-
-            QvalueDelta = 0;
-            meanOld = 0;
-            meanNew = 0 ;
-            sum = 0;
-            // 遍历集合
-            for (int i = 0; i < NumOfCloudlet; i++) {
+//            //随机遍历，彻底解决for中的max筛选次序问题
+//            Set<Integer> num = new LinkedHashSet<>();
+//            Random r2 = new Random();
+//            while (num.size() < NumOfCloudlet) {
+//                // 生成0-10的数组，观看有无重复值
+//                num.add(r2.nextInt(NumOfCloudlet));
+//            }
+//            Integer[] strs = new Integer[num.size()];
+//            num.toArray(strs);
+            double QvalueDelta = 0;
+            double sum = 0;
+            // 遍历集合每一行cloudlet
+            for (int i = 0; i < cloudletList.size(); i++) {
                 // 到达目标状态，结束循环，进行下一轮训练
                 int VmID;
-                int CloudID = strs[i];
+                int CloudID = i;
                 //增加行列的存储变量，应对随机行选取，以求map按对应顺序保存字典
-                chosenCloudletID.add(CloudID);
+                chosenCloudletID.add(i);
 
                 //if (Math.random() < (1 - epsilon))
 
@@ -192,22 +161,27 @@ public class CloudletToVmMappingQlearn
                 // 更新排除列表状态
                 chosenVmID.add(VmID);
                 //todo：奖励函数需要设计，倒数太简单，负数不对，负数上面代码VmID不能用max函数选，应该用min
-                double reward = rewardDesign(REWARD_TAG,i,CloudID,VmID);//0是差值奖励，1是+-1
-
+                sum = sum + graph[CloudID][VmID]; // 奖励，是执行时间的倒数，改成累积执行时间和的倒数
+                double reward = 1000/sum;
+                //reward = 1000/graph[CloudID][VmID]
+                //double reward = 50*Math.exp(graph[CloudID][VmID]/100);
                 //更新Q表,注意最后那行只能和初始行循环更新
                 double QOldValue = Q[CloudID][VmID];
-                if (i + 1 < NumOfCloudlet)
-                    Q[CloudID][VmID] = (1 - alpha) * Q[CloudID][VmID] + alpha * (reward + gamma * maxNextQ(Q[strs[i + 1]], chosenVmID));
+                if (i + 1 < cloudletList.size())
+                    Q[CloudID][VmID] = (1 - alpha) * Q[CloudID][VmID] + alpha * (reward + gamma * maxNextQ(Q[i + 1], chosenVmID));
                 else Q[CloudID][VmID] = (1 - alpha) * Q[CloudID][VmID] + alpha * (reward + 0);
                 //求出各状态和上一次求得状态的最大差值
                 QvalueDelta = Math.max(QvalueDelta, Math.abs(QOldValue - Q[CloudID][VmID] ));
 
             }
             for (int i=0 ;i<NumOfCloudlet;i++){
-                map.put(chosenCloudletID.get(i), chosenVmID.get(i));//更新map结果,只要迭代episode最后一次的
+                map.put(chosenCloudletID.get(i), chosenVmID.get(i));//更新map结果,只要迭代episode最后一次的？
             }
             System.out.println(Arrays.deepToString(Q));
-            System.out.println("本轮CloudID和VMID匹配为"+map);
+            System.out.println("本轮CloudID和VMID匹配为"+map+"总消耗时间是"+sum);
+//            reward2=-sum; //奖励2的函数，总时间的负数或倒数
+//            Q2=(1 - alpha) * Q2.get(map) + alpha * (reward + gamma * maxNextQ(Q[i + 1], chosenVmID));
+//            Q2.put(map,reward2);//更新Q表
             System.out.println("本轮最大差值是"+QvalueDelta);
 
             //todo:增加停止阀值
@@ -221,7 +195,7 @@ public class CloudletToVmMappingQlearn
 
         }
         //画图
-        //draw2D(processList,QvalueDeltaList);
+        //draw2D(QvalueDeltaList);
     }
 
     /**
@@ -229,24 +203,26 @@ public class CloudletToVmMappingQlearn
      * @param is Q表中 ‘CloudID’ 所在行向量Q[CloudID]
      * @return 随机的列号
      */
-//    private static int randomNext(double[] is,List<Integer> chosenVmID) { //
-//        int columns  = 0, n = 1;
-//        for(int i = 0; i < is.length; ++i) {
-//            if(chosenVmID.contains(i)) continue;
-//            else if(is[i] >= 0 && Math.random() < 1.0/n++) columns  = i;
-//        }
-//        return columns ;
-//    }
     private static int randomNext(double[] is,List<Integer> chosenVmID) { //
-        Random r3 = new Random();
-        while(true) {
-            int columns = r3.nextInt(is.length);      //随机生成一个0~length的整数columns
-            if (chosenVmID.contains(columns)) {        //排除已选择的
-                continue;
-            }
-            else return columns;
+        int columns  = 0, n = 1;
+        for(int i = 0; i < is.length; ++i) {
+            if(chosenVmID.contains(i)) continue;
+            else if(is[i] >= 0 && Math.random() < 1.0/n++) columns  = i;
         }
+        return columns ;
     }
+//    private static int randomNext(double[] is,List<Integer> chosenVmID) { //
+//        Random r3 = new Random();
+//        while(true) {
+//            int columns = r3.nextInt(is.length);      //随机生成一个0~length的整数columns
+//            if (chosenVmID.contains(columns)) {        //排除已选择的
+//                continue;
+//            }
+//            else return columns;
+//        }
+//    }
+
+
 
     /**
      * 找出is向量的最大值，并保证候选的 VmID 不属于 已经被选过的 chosenVmID
@@ -282,17 +258,22 @@ public class CloudletToVmMappingQlearn
         return is[VmID];
     }
 
+
+
     public List<Vm> getVmList() {
         return vmList;
     }
+
 
     public void setVmList(List<Vm> vmList) {
         this.vmList = vmList;
     }
 
+
     public List<Cloudlet> getCloudletList() {
         return cloudletList;
     }
+
 
     public void setCloudletList(final List<Cloudlet> cloudletList) {
         this.cloudletList = cloudletList;
@@ -337,77 +318,33 @@ public class CloudletToVmMappingQlearn
 //    }
 
     /**
-     * 画图 https://www.cnblogs.com/wuwuyong/p/10600749.html
+     * 画图 用Jython调用python https://www.cnblogs.com/wuwuyong/p/10600749.html
      *
      */
-//    public void draw2D(List a,List b) {
-//
-//        PythonInterpreter interpreter = new PythonInterpreter();
-//            interpreter.execfile("D:\\迅雷下载\\drawJava.py");
-//
-//        // 第一个参数为期望获得的函数（变量）的名字，第二个参数为期望返回的对象类型
-//        PyFunction pyFunction = interpreter.get("drawJava", PyFunction.class);
-//
-//        //调用函数，如果函数需要参数，在Java中必须先将参数转化为对应的“Python类型”
-//        pyFunction.__call__(new PyList(a), new PyList(b));
-//
-//    }
 
+    public void draw2D(List a) {
+        //添加第三方库matplotlib https://blog.csdn.net/ztf312/article/details/51338060
+        PySystemState sys = Py.getSystemState();
+        System.out.println(sys.path.toString()); // previous
+        sys.path.add("d:\\programdata\\anaconda3\\lib\\site-packages\\");
+        System.out.println(sys.path.toString());
+
+        PythonInterpreter interpreter = new PythonInterpreter();
+        interpreter.execfile("D:\\drawJava.py");
+
+        // 第一个参数为期望获得的函数（变量）的名字，第二个参数为期望返回的对象类型
+        PyFunction pyFunction = interpreter.get("drawJava", PyFunction.class);
+        //调用函数，如果函数需要参数，在Java中必须先将参数转化为对应的“Python类型”
+        pyFunction.__call__(new PyList(a));
+
+    }
     /**
      * 画图 https://github.com/jfree/jfreechart
      * *
      */
 
-    /**
-     * 求平均长度
-     * @return cloudlet的平均长度
-     */
-    private double getMeanLength(){
-        double sum=0;
-        for (Cloudlet cl:this.cloudletList) {
-           sum+=cl.getTotalLength();
-        }
-        return sum/NumOfCloudlet;
-    }
 
-    private double rewardDesign(int tag,int i,int CloudID,int VmID) {
-        double reward;
-        sum = sum + graph[CloudID][VmID];
-        meanNew = sum / (i + 1);
-        switch (tag) {
-            case 0: {
-                reward = meanOld - meanNew; // 奖励，是低于平均时间的程度
-                break;
-            }
-            case 1:{
-                if ((meanOld - meanNew) < 0) reward = -10.0; //拉低了平均时间则奖励 1 否则 -1
-                else reward = 1.0;
-                break;
-            }
-            case 2:{
-                reward = 1/meanNew; //执行平均时间的倒数
-                break;
-            }
-            case 3:{
-                reward = -meanNew; //执行平均时间的倒数
-                break;
-            }
-            default: return 0;
-        }
-        meanOld = meanNew;//更新mean
-        return reward;
-    }
 
-    private Integer[] randowRow(){
-        Set<Integer> num = new LinkedHashSet<>();
-        Random r2 = new Random();
-        while (num.size() < NumOfCloudlet) {
-            // 生成0-10的数组，观看有无重复值
-            num.add(r2.nextInt(NumOfCloudlet));
-        }
-        Integer[] strs = new Integer[num.size()];
-        num.toArray(strs);
-        return strs;
-    }
+
 }
 
